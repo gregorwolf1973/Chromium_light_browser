@@ -1,0 +1,22 @@
+configuration:
+  idle_minutes:
+    name: Schlafen nach (Minuten)
+    description: "Nach so vielen Minuten ohne Nutzung wird Chromium beendet und der Arbeitsspeicher frei. 0 = nie schlafen (z. B. damit WhatsApp Web dauerhaft verbunden bleibt)."
+  sites:
+    name: Seiten
+    description: "Kacheln in der Leiste und auf der Startseite. Je Seite: name, url und logout_on_sleep (true = beim Einschlafen abmelden: Tabs schliessen, Cookies und Seitendaten dieser Domain loeschen - fuer Online-Banking)."
+  logout_domains:
+    name: Zusaetzlich abmelden von
+    description: "Weitere Domains, deren Anmeldung beim Einschlafen geloescht wird, z. B. wenn das Banking auf einer anderen Domain laeuft als die Kachel. Subdomains sind eingeschlossen."
+  save_passwords:
+    name: Passwoerter speichern erlauben
+    description: "Aus (empfohlen): Chromium bietet nicht an, Passwoerter zu speichern. Anmeldungen per Cookie (WhatsApp, Heimnetz-Geraete) bleiben trotzdem erhalten."
+  low_memory_mode:
+    name: Sparmodus
+    description: "Chromiums Modus fuer schwache Geraete: weniger Speicher, etwas einfachere Darstellung."
+  renderer_process_limit:
+    name: Hoechstzahl Seitenprozesse
+    description: "Wie viele Prozesse Chromium fuer Webseiten nutzt (Standard 4). Weniger = weniger Speicher, bei vielen Tabs teilen sie sich dann Prozesse."
+  language:
+    name: Sprache
+    description: "Sprache der Chromium-Oberflaeche und bevorzugte Sprache fuer Webseiten, z. B. de oder en."

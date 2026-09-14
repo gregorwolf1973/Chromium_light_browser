@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Startseite</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; font:15px/1.4 system-ui,"Segoe UI",Roboto,sans-serif; background:#f5f6fa; color:#1c1c1c; }
+  @media (prefers-color-scheme: dark) { body { background:#111318; color:#c8cdd5; } .tile { background:#1c1f27 !important; border-color:#333842 !important; } }
+  main { max-width:900px; margin:60px auto; padding:0 20px; }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  .sub { color:#6e7681; margin-bottom:24px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
+  .tile { display:flex; flex-direction:column; gap:4px; padding:18px; background:#fff; border:1px solid #e1e5eb; border-radius:14px;
+          text-decoration:none; color:inherit; }
+  .tile:hover { border-color:#1a73e8; }
+  .ico { width:40px; height:40px; border-radius:10px; background:#1a73e8; color:#fff; display:flex; align-items:center; justify-content:center;
+         font-weight:700; font-size:1.2rem; margin-bottom:6px; }
+  .nm { font-weight:600; }
+  .u { color:#6e7681; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .empty { color:#6e7681; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Chromium Light Browser</h1>
+  <div class="sub">Deine Seiten. Weitere in der Addon-Konfiguration unter „sites“ eintragen.</div>
+  <div class="grid"><!--TILES--></div>
+</main>
+</body>
+</html>

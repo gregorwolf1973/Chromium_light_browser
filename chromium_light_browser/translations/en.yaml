@@ -1,0 +1,22 @@
+configuration:
+  idle_minutes:
+    name: Sleep after (minutes)
+    description: "After this many minutes without use Chromium is stopped and its memory freed. 0 = never sleep (e.g. to keep WhatsApp Web connected)."
+  sites:
+    name: Sites
+    description: "Tiles in the bar and on the start page. Per site: name, url and logout_on_sleep (true = log out when the browser sleeps: close its tabs, delete cookies and site data of that domain - for online banking)."
+  logout_domains:
+    name: Also log out of
+    description: "More domains whose login is wiped when the browser sleeps, e.g. when banking runs on a different domain than the tile. Subdomains are included."
+  save_passwords:
+    name: Allow saving passwords
+    description: "Off (recommended): Chromium does not offer to save passwords. Cookie logins (WhatsApp, devices on your network) are kept anyway."
+  low_memory_mode:
+    name: Low memory mode
+    description: "Chromium's mode for low-end devices: less memory, slightly simpler rendering."
+  renderer_process_limit:
+    name: Max. page processes
+    description: "How many processes Chromium uses for web pages (default 4). Fewer = less memory; with many tabs they share processes."
+  language:
+    name: Language
+    description: "Language of the Chromium UI and preferred language for web pages, e.g. de or en."
