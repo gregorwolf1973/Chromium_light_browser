@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.2
+
+- **Fix: Nach dem Update auf 0.2.x blieb die Seite leer.** Der Browser nahm die alte `app.js` aus dem Zwischenspeicher, die zur neuen Seite nicht passt, und brach ab. `app.js` wird jetzt mit ihrer Versionskennung im Adresszusatz geladen, und alle Dateien unter `static/` werden bei jedem Aufruf neu geprueft.
+
 ## 0.2.1
 
 - Eigenes Icon und Logo (Browserfenster mit Mond: startet bei Bedarf, schlaeft danach) fuer den Addon-Store und die Addon-Seite.

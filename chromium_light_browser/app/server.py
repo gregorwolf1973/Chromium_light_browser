@@ -40,6 +40,16 @@ STATIC = os.path.join(HERE, "static")
 NOVNC = "/usr/share/novnc"
 
 
+def asset_version():
+    """Short content hash of app.js: part of its URL, so a new version is a new URL."""
+    import hashlib
+    try:
+        with open(os.path.join(STATIC, "app.js"), "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()[:12]
+    except OSError:
+        return "0"
+
+
 def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None):
     app = web.Application(client_max_size=64 * 1024)
     state = {
@@ -67,6 +77,10 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
         elif request.method == "POST" and request.headers.get("X-CLB") != "1":
             raise web.HTTPBadRequest(text="bad request")
         resp = await handler(request)
+        if path.startswith("/static/"):
+            # always revalidate: a cached app.js from an older version next to a
+            # new index.html broke the page after an update
+            resp.headers["Cache-Control"] = "no-cache"
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
         resp.headers.setdefault("Referrer-Policy", "no-referrer")
         return resp
@@ -90,6 +104,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
         with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
             html = f.read()
         html = html.replace("/*__CONFIG__*/null", json.dumps(public_config()).replace("</", "<\\/"))
+        html = html.replace('src="static/app.js"', f'src="static/app.js?v={asset_version()}"')
         return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-store"})
 
     async def start_page(request):
