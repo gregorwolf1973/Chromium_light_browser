@@ -50,6 +50,13 @@ class OptionsTest(unittest.TestCase):
         self.assertIn("--enable-low-end-device-mode", args)
         self.assertEqual(args[-1], "http://127.0.0.1:8099/start")
         self.assertFalse(any(a.startswith("--remote-allow-origins") for a in args), "sonst koennten Webseiten an DevTools")
+        ext = [a.split("=", 1)[1] for a in args if a.startswith("--load-extension=")]
+        self.assertEqual(len(ext), 1)
+        manifest = json.load(open(os.path.join(ext[0], "manifest.json"), encoding="utf-8"))
+        self.assertEqual(manifest["chrome_url_overrides"]["newtab"], "newtab.html")
+        self.assertTrue(os.path.exists(os.path.join(ext[0], "newtab.js")))
+        self.assertIn("127.0.0.1:8099/start", open(os.path.join(ext[0], "newtab.js"), encoding="utf-8").read())
+        self.assertIn("--disable-background-networking", args)
         self.assertEqual(sess.clamp_size(100, 99999), (1024, 1600))
         self.assertEqual(sess.clamp_size("x", None), (1280, 800))
         self.assertEqual(sess.clamp_size(1333, 777), (1332, 776))
@@ -67,6 +74,7 @@ class OptionsTest(unittest.TestCase):
             self.assertEqual(prefs["profile"]["name"], "x")
             self.assertEqual(prefs["profile"]["exit_type"], "Normal")
             self.assertFalse(prefs["credentials_enable_service"])
+            self.assertFalse(prefs["translate"]["enabled"])
             self.assertEqual(prefs["download"]["default_directory"], dl)
             self.assertTrue(os.path.isdir(dl))
         finally:
@@ -318,7 +326,8 @@ class FakeSession:
 class ServerTest(unittest.IsolatedAsyncioTestCase):
     async def make(self, allowed):
         self.fs = FakeSession()
-        app = server.create_app(options.normalise(RAW), session=self.fs, allowed_ips=allowed)
+        app = server.create_app(options.normalise(RAW), session=self.fs, allowed_ips=allowed,
+                                local_token="SECRET-TOKEN")
         c = TestClient(TestServer(app))
         await c.start_server()
         self.addAsyncCleanup(c.close)
@@ -326,16 +335,50 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_only_ingress_may_use_the_api(self):
         c = await self.make({"172.30.32.2"})          # the test client comes from 127.0.0.1, like Chromium would
-        for path in ("/", "/api/status", "/api/tabs", "/websockify"):
+        for path in ("/", "/api/status", "/api/ui", "/websockify"):
             self.assertEqual((await c.get(path)).status, 403, path)
         r = await c.post("/api/wake", json={}, headers={"X-CLB": "1"})
         self.assertEqual(r.status, 403)
         self.assertEqual(self.fs.state, "sleeping")
         r = await c.get("/start")
         self.assertEqual(r.status, 200, "die Startseite ist fuer Chromium selbst")
+        self.assertEqual(r.headers["X-Frame-Options"], "DENY")
         html = await r.text()
         self.assertIn("web.whatsapp.com", html)
+        self.assertIn("Sparkasse 🔒", html)
         self.assertNotIn("javascript:", html)
+        self.assertIn("SECRET-TOKEN", html)
+
+    async def test_start_page_api_needs_the_secret(self):
+        c = await self.make({"172.30.32.2"})
+        self.fs.state = "running"
+        # a web page in the browser comes from 127.0.0.1 too, but does not know the secret
+        for headers in ({}, {"X-CLB-Local": "falsch"}, {"X-CLB": "1"}):
+            self.assertEqual((await c.get("/api/local/status", headers=headers)).status, 403, headers)
+            self.assertEqual((await c.post("/api/local/sleep", headers=headers)).status, 403, headers)
+        self.assertEqual(self.fs.state, "running")
+        ok = {"X-CLB-Local": "SECRET-TOKEN"}
+        self.assertEqual((await (await c.get("/api/local/status", headers=ok)).json())["state"], "running")
+        self.assertEqual((await c.post("/api/local/clipboard", headers=ok)).status, 200)
+        self.assertEqual((await c.post("/api/local/sleep", headers=ok)).status, 200)
+        for _ in range(50):
+            if self.fs.state == "sleeping":
+                break
+            await asyncio.sleep(0.02)
+        self.assertEqual(self.fs.state, "sleeping")
+
+    async def test_clipboard_request_reaches_the_sidebar_once(self):
+        fs = FakeSession()
+        fs.state = "running"
+        app = server.create_app(options.normalise(RAW), session=fs, allowed_ips={"127.0.0.1"},
+                                local_token="SECRET-TOKEN")
+        c = TestClient(TestServer(app))
+        await c.start_server()
+        self.addAsyncCleanup(c.close)
+        await c.post("/api/local/clipboard", headers={"X-CLB-Local": "SECRET-TOKEN"})
+        await c.post("/api/local/clipboard", headers={"X-CLB-Local": "SECRET-TOKEN"})
+        self.assertEqual((await (await c.get("/api/ui")).json())["requests"], ["clipboard"])
+        self.assertEqual((await (await c.get("/api/ui")).json())["requests"], [])
 
     async def test_api_through_ingress(self):
         c = await self.make({"127.0.0.1"})

@@ -5,77 +5,53 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Chromium Light Browser</title>
 <style>
-  :root { color-scheme: light; --bg:#f5f6fa; --bar:#ffffff; --border:#e1e5eb; --text:#1c1c1c; --dim:#6e7681;
-          --accent:#1a73e8; --accent-text:#fff; --ok:#0f9d58; --warn:#f4b400; --danger:#db4437; --chip:#f0f2f5; }
-  @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg:#111318; --bar:#1c1f27; --border:#333842;
+  :root { color-scheme: light; --bg:#f5f6fa; --card:#ffffff; --border:#e1e5eb; --text:#1c1c1c; --dim:#6e7681;
+          --accent:#1a73e8; --accent-text:#fff; --danger:#db4437; --chip:#f0f2f5; }
+  @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --bg:#111318; --card:#1c1f27; --border:#333842;
           --text:#c8cdd5; --dim:#7b8390; --accent:#8ab4f8; --accent-text:#0a0a0a; --chip:#252830; } }
   * { box-sizing:border-box; }
   [hidden] { display:none !important; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
+  html, body { margin:0; height:100%; background:#000; color:var(--text);
                font:14px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; overflow:hidden; }
-  body { display:flex; flex-direction:column; }
-  .bar { display:flex; align-items:center; gap:8px; padding:6px 10px; background:var(--bar); border-bottom:1px solid var(--border);
-         min-height:44px; flex-wrap:nowrap; overflow-x:auto; }
-  .brand { font-weight:600; white-space:nowrap; display:flex; align-items:center; gap:6px; }
-  .dot { width:8px; height:8px; border-radius:50%; background:var(--dim); flex:none; }
-  .dot.running { background:var(--ok); box-shadow:0 0 6px var(--ok); }
-  .dot.starting, .dot.stopping { background:var(--warn); }
-  .sep { width:1px; align-self:stretch; background:var(--border); margin:2px 2px; flex:none; }
+  #screen, #vnc { position:absolute; inset:0; }
   button { font:inherit; color:var(--text); background:var(--chip); border:1px solid var(--border); border-radius:8px;
-           padding:5px 10px; cursor:pointer; white-space:nowrap; }
+           padding:8px 14px; cursor:pointer; }
   button:hover { border-color:var(--accent); }
   button.primary { background:var(--accent); color:var(--accent-text); border-color:var(--accent); font-weight:600; }
-  button.icon { padding:5px 8px; }
-  .sites { display:flex; gap:6px; }
-  .tabs { display:flex; gap:4px; min-width:0; overflow-x:auto; flex:1; }
-  .tab { display:flex; align-items:center; gap:4px; max-width:190px; padding:3px 4px 3px 8px; border-radius:8px; background:var(--chip);
-         border:1px solid var(--border); font-size:12px; }
-  .tab span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
-  .tab button { border:none; background:none; padding:0 4px; color:var(--dim); }
-  .info { color:var(--dim); font-size:12px; white-space:nowrap; }
-  #screen { flex:1; position:relative; background:#000; min-height:0; }
-  #screen > div { width:100%; height:100%; }
   .overlay { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:var(--bg); padding:20px; }
-  .card { background:var(--bar); border:1px solid var(--border); border-radius:14px; padding:26px 28px; max-width:560px; width:100%; text-align:center; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:26px 28px; max-width:560px; width:100%; text-align:center; }
   .card h1 { font-size:1.2rem; margin:0 0 6px; }
   .card p { color:var(--dim); margin:0 0 16px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:10px; margin-top:16px; }
   .grid button { padding:12px 8px; }
   .err { color:var(--danger); margin-top:12px; font-size:13px; }
-  .panel { position:absolute; top:8px; right:8px; width:340px; max-width:calc(100% - 16px); background:var(--bar); border:1px solid var(--border);
-           border-radius:12px; padding:12px; box-shadow:0 8px 30px rgba(0,0,0,.3); z-index:5; }
-  .panel textarea { width:100%; height:120px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font:inherit; }
-  .panel .row { display:flex; gap:6px; justify-content:flex-end; margin-top:8px; }
+  .panel { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:420px; max-width:calc(100% - 24px);
+           background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 12px 40px rgba(0,0,0,.45); z-index:5; }
+  .panel h2 { font-size:1rem; margin:0 0 4px; }
+  .panel .dim { color:var(--dim); font-size:12px; margin-bottom:10px; }
+  .panel textarea { width:100%; height:140px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px; font:inherit; }
+  .panel .row { display:flex; gap:6px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
+  .toast { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(20,20,20,.85); color:#fff; padding:6px 12px;
+           border-radius:8px; font-size:12px; z-index:6; pointer-events:none; }
   .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
   @keyframes spin { to { transform:rotate(360deg); } }
 </style>
 </head>
 <body>
-<div class="bar">
-  <span class="brand"><span class="dot" id="dot"></span>Browser</span>
-  <span class="sep"></span>
-  <div class="sites" id="sites"></div>
-  <span class="sep"></span>
-  <div class="tabs" id="tabs"></div>
-  <span class="info" id="info"></span>
-  <button class="icon" id="clip-btn" title="Zwischenablage">📋</button>
-  <button class="icon" id="full-btn" title="Vollbild">⛶</button>
-  <button id="sleep-btn" title="Browser jetzt schlafen legen und Speicher freigeben">💤 Schlafen</button>
-</div>
 <div id="screen">
   <div id="vnc"></div>
-  <div class="overlay" id="overlay">
-    <div class="card" id="card"></div>
-  </div>
+  <div class="overlay" id="overlay"><div class="card" id="card"></div></div>
   <div class="panel" id="clip-panel" hidden>
-    <strong>Zwischenablage</strong>
-    <div class="info" style="margin:4px 0 8px">Text hier einfügen und in den Browser übertragen – oder im Browser kopierten Text hier abholen.</div>
+    <h2>📋 Zwischenablage</h2>
+    <div class="dim">Oben steht, was im Browser zuletzt kopiert wurde. Eigenen Text hier einfügen und mit „In den Browser“ übertragen – danach im Browser mit Strg+V einfügen.</div>
     <textarea id="clip-text"></textarea>
     <div class="row">
+      <button id="clip-close">Schließen</button>
       <button id="clip-copy">Auf dieses Gerät kopieren</button>
       <button class="primary" id="clip-send">In den Browser</button>
     </div>
   </div>
+  <div class="toast" id="toast" hidden></div>
 </div>
 <script>window.CLB_CONFIG = /*__CONFIG__*/null;</script>
 <script type="module" src="static/app.js"></script>

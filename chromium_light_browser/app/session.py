@@ -50,22 +50,34 @@ def chromium_binary():
     return shutil.which("chromium-browser") or shutil.which("chromium") or "chromium-browser"
 
 
+NEWTAB_EXTENSION = os.path.join(os.path.dirname(os.path.abspath(__file__)), "newtab")
+
+
 def chromium_args(opts, w, h, start_url):
     args = [
         "--no-sandbox",              # container without user namespaces; runs as an unprivileged user
         "--test-type",               # hides the "unsupported flag" warning bar that --no-sandbox brings
         f"--user-data-dir={PROFILE}",
         "--no-first-run", "--no-default-browser-check",
-        "--disable-dev-shm-usage", "--disable-gpu",
+        "--disable-dev-shm-usage",
+        # no GPU process at all: there is no GPU, and the SwiftShader fallback
+        # only costs memory and fills the log with EGL errors
+        "--disable-gpu", "--disable-software-rasterizer",
         f"--renderer-process-limit={opts['renderer_process_limit']}",
         "--disk-cache-size=67108864",
-        "--disable-features=Translate,MediaRouter,OptimizationHints,AutofillServerCommunication",
+        "--disable-features=Translate,TranslateUI,MediaRouter,OptimizationHints,AutofillServerCommunication",
+        # no Google push registration (fails without API keys anyway) and no
+        # background fetches while the page is idle
+        "--disable-background-networking",
         "--password-store=basic",
         f"--remote-debugging-port={CDP_PORT}", "--remote-debugging-address=127.0.0.1",
         "--window-position=0,0", f"--window-size={w},{h}", "--start-maximized",
         f"--lang={opts['language']}",
         "--hide-crash-restore-bubble",
         "--mute-audio", "--autoplay-policy=user-gesture-required",
+        # every new tab shows the start page with the site tiles
+        f"--load-extension={NEWTAB_EXTENSION}",
+        "--log-level=3",             # Chromium's own D-Bus/GCM noise stays out of the add-on log
     ]
     if opts["low_memory_mode"]:
         args.append("--enable-low-end-device-mode")
@@ -95,6 +107,8 @@ def prepare_profile(opts, profile=PROFILE, downloads=DOWNLOADS):
     prefs["profile"]["exit_type"] = "Normal"
     prefs["profile"]["exited_cleanly"] = True
     prefs.setdefault("intl", {})["accept_languages"] = f"{opts['language']},en"
+    prefs.setdefault("translate", {})["enabled"] = False        # no "translate this page?" bubble
+    prefs.setdefault("extensions", {}).setdefault("ui", {})["developer_mode"] = False
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(prefs, f)
@@ -248,18 +262,22 @@ class Session:
             log(f"Browser schlaeft ein ({reason})")
             domains = options.logout_domains(self.opts)
             session = self._http or aiohttp.ClientSession()
+            chromium_up = await _port_open(CDP_PORT)
+            if not chromium_up:
+                log("Chromium laeuft nicht mehr - Abmelden entfaellt (Sitzungs-Cookies sind mit ihm beendet)")
             try:
-                if domains:
+                if domains and chromium_up:
                     try:
                         s = await cdp.logout(session, domains)
                         log(f"Abgemeldet von {', '.join(domains)}: {s['tabs_closed']} Tabs geschlossen, "
                             f"{s['cookies_deleted']} Cookies geloescht")
                     except Exception as e:
                         log(f"Abmelden unvollstaendig: {type(e).__name__}: {e}")
-                try:
-                    await cdp.close_browser(session)
-                except Exception:
-                    pass
+                if chromium_up:
+                    try:
+                        await cdp.close_browser(session)
+                    except Exception:
+                        pass
             finally:
                 if self._http is None:
                     await session.close()

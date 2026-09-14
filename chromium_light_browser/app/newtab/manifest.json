@@ -1,0 +1,9 @@
+{
+  "manifest_version": 3,
+  "name": "Chromium Light Browser – Startseite",
+  "version": "1.0",
+  "description": "Zeigt in jedem neuen Tab die Startseite mit deinen Seiten.",
+  "chrome_url_overrides": {
+    "newtab": "newtab.html"
+  }
+}

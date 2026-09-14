@@ -1,17 +1,26 @@
 #!/usr/bin/env python3
 """Chromium Light Browser - controller and web UI (Home Assistant ingress).
 
-The add-on publishes no port. Everything arrives through the Supervisor's
-ingress proxy, i.e. from a signed-in Home Assistant user. Requests from any
-other address are refused - that matters because the browser inside the
-container can reach this server on 127.0.0.1: a web page open in it must not
-be able to connect to the VNC stream or the API and watch or steer the
-browser (think of an open banking session).
+The add-on publishes no port. The sidebar page, its API and the VNC stream only
+answer the Supervisor's ingress proxy, i.e. a signed-in Home Assistant user.
+
+The browser inside the container reaches this server on 127.0.0.1 as well. A
+web page open in it must not be able to watch or steer the browser (think of an
+open banking session), so from 127.0.0.1 there is exactly:
+
+- /start - the start page with the site tiles (every new tab shows it);
+- /api/local/* - sleep, status and "open the clipboard panel", and only with
+  the per-run secret that is embedded in /start. Other pages cannot read /start
+  (different origin, no CORS), so they never learn the secret, and a custom
+  header rules out simple cross-site form posts.
 """
 import asyncio
+import hmac
 import json
 import os
+import secrets
 import sys
+from html import escape
 
 import aiohttp
 from aiohttp import web
@@ -31,21 +40,31 @@ STATIC = os.path.join(HERE, "static")
 NOVNC = "/usr/share/novnc"
 
 
-def create_app(opts, session=None, allowed_ips=None, http=None):
+def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None):
     app = web.Application(client_max_size=64 * 1024)
-    app["opts"] = opts
-    app["session"] = session or sess.Session(opts, start_url=f"http://127.0.0.1:{PORT}/start")
-    app["allowed"] = set(allowed_ips if allowed_ips is not None else INGRESS_PROXY_IPS)
-    app["http"] = http
+    state = {
+        "session": session or sess.Session(opts, start_url=f"http://127.0.0.1:{PORT}/start"),
+        "allowed": set(allowed_ips if allowed_ips is not None else INGRESS_PROXY_IPS),
+        "http": http,
+        "token": local_token or secrets.token_urlsafe(32),
+        "ui": [],                     # requests from the start page for the sidebar page
+        "watcher": None,
+    }
+    app["state"] = state
 
     @web.middleware
     async def guard(request, handler):
-        if request.path == "/start":
-            if request.remote not in LOCAL_IPS | app["allowed"]:
+        path, remote = request.path, request.remote
+        if path == "/start":
+            if remote not in LOCAL_IPS | state["allowed"]:
                 raise web.HTTPForbidden()
-        elif request.remote not in app["allowed"]:
+        elif path.startswith("/api/local/"):
+            if remote not in LOCAL_IPS or not hmac.compare_digest(
+                    request.headers.get("X-CLB-Local", ""), state["token"]):
+                raise web.HTTPForbidden()
+        elif remote not in state["allowed"]:
             raise web.HTTPForbidden(text="Nur ueber die Home-Assistant-Seitenleiste erreichbar.")
-        if request.method == "POST" and request.headers.get("X-CLB") != "1":
+        elif request.method == "POST" and request.headers.get("X-CLB") != "1":
             raise web.HTTPBadRequest(text="bad request")
         resp = await handler(request)
         resp.headers.setdefault("X-Content-Type-Options", "nosniff")
@@ -55,33 +74,37 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
     app.middlewares.append(guard)
 
     async def http_session():
-        if app["http"] is None:
-            app["http"] = aiohttp.ClientSession()
-        return app["http"]
+        if state["http"] is None:
+            state["http"] = aiohttp.ClientSession()
+        return state["http"]
+
+    def s():
+        return state["session"]
+
+    def public_config():
+        return {"sites": [{"name": x["name"], "url": x["url"], "logout": x["logout_on_sleep"]} for x in opts["sites"]],
+                "idle_minutes": opts["idle_minutes"]}
 
     # ── pages ───────────────────────────────────────────────────────────────
     async def index(request):
         with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
             html = f.read()
-        public = {"sites": [{"name": s["name"], "url": s["url"], "logout": s["logout_on_sleep"]}
-                            for s in opts["sites"]],
-                  "idle_minutes": opts["idle_minutes"]}
-        html = html.replace("/*__CONFIG__*/null", json.dumps(public).replace("</", "<\\/"))
+        html = html.replace("/*__CONFIG__*/null", json.dumps(public_config()).replace("</", "<\\/"))
         return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-store"})
 
     async def start_page(request):
         with open(os.path.join(STATIC, "start.html"), encoding="utf-8") as f:
             html = f.read()
-        from html import escape
         tiles = "".join(
-            f'<a class="tile" href="{escape(s["url"], quote=True)}"><span class="ico">{escape(s["name"][:1].upper())}</span>'
-            f'<span class="nm">{escape(s["name"])}</span><span class="u">{escape(s["url"])}</span></a>'
-            for s in opts["sites"]) or '<p class="empty">Noch keine Seiten eingerichtet - in der Addon-Konfiguration unter "sites" eintragen.</p>'
-        return web.Response(text=html.replace("<!--TILES-->", tiles), content_type="text/html")
-
-    # ── API ─────────────────────────────────────────────────────────────────
-    async def status(request):
-        return web.json_response(app["session"].status())
+            f'<a class="tile" href="{escape(x["url"], quote=True)}">'
+            f'<span class="ico">{escape(x["name"][:1].upper())}</span>'
+            f'<span class="nm">{escape(x["name"])}{" 🔒" if x["logout_on_sleep"] else ""}</span>'
+            f'<span class="u">{escape(x["url"])}</span></a>'
+            for x in opts["sites"]) or ('<p class="empty">Noch keine Seiten eingerichtet - in der Addon-Konfiguration '
+                                         'unter „sites“ eintragen.</p>')
+        html = html.replace("<!--TILES-->", tiles).replace("__LOCAL_TOKEN__", state["token"])
+        return web.Response(text=html, content_type="text/html",
+                            headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
 
     async def body(request):
         try:
@@ -90,21 +113,24 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
             data = {}
         return data if isinstance(data, dict) else {}
 
+    # ── sidebar API (ingress) ───────────────────────────────────────────────
+    async def status(request):
+        return web.json_response(s().status())
+
     async def wake(request):
         data = await body(request)
-        st = await app["session"].wake(data.get("w", 1280), data.get("h", 800))
+        st = await s().wake(data.get("w", 1280), data.get("h", 800))
         return web.json_response(st, status=200 if st["state"] == sess.RUNNING else 503)
 
     async def sleep(request):
-        return web.json_response(await app["session"].sleep("manuell"))
+        return web.json_response(await s().sleep("manuell"))
 
     async def activity(request):
-        app["session"].touch()
+        s().touch()
         return web.json_response({"ok": True})
 
     async def open_site(request):
         data = await body(request)
-        s = app["session"]
         if "site" in data:
             try:
                 url = opts["sites"][int(data["site"])]["url"]
@@ -114,43 +140,40 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
             url = str(data.get("url") or "")
             if not url.startswith(("http://", "https://")):
                 raise web.HTTPBadRequest(text="url must be http(s)")
-        if s.state != sess.RUNNING:
-            st = await s.wake(data.get("w", 1280), data.get("h", 800))
+        if s().state != sess.RUNNING:
+            st = await s().wake(data.get("w", 1280), data.get("h", 800))
             if st["state"] != sess.RUNNING:
                 return web.json_response(st, status=503)
-        s.touch()
+        s().touch()
         try:
             res = await cdp.open_url(await http_session(), url)
         except Exception as e:
             return web.json_response({"error": f"{type(e).__name__}: {e}"}, status=502)
         return web.json_response({"ok": True, **res})
 
-    async def tabs(request):
-        s = app["session"]
-        if s.state != sess.RUNNING:
-            return web.json_response({"tabs": []})
-        try:
-            return web.json_response({"tabs": await cdp.pages(await http_session())})
-        except Exception as e:
-            return web.json_response({"tabs": [], "error": str(e)})
+    async def ui_requests(request):
+        """The sidebar page polls this while the picture is live."""
+        pending, state["ui"] = state["ui"], []
+        return web.json_response({"requests": pending, "state": s().state})
 
-    async def tab_action(request):
-        data = await body(request)
-        tid = str(data.get("id") or "")
-        if not tid or app["session"].state != sess.RUNNING:
-            raise web.HTTPBadRequest(text="no tab")
-        app["session"].touch()
-        fn = cdp.close if request.match_info["action"] == "close" else cdp.activate
-        try:
-            await fn(await http_session(), tid)
-        except Exception as e:
-            return web.json_response({"error": str(e)}, status=502)
+    # ── start page API (inside the browser, with the secret) ───────────────
+    async def local_status(request):
+        return web.json_response(s().status())
+
+    async def local_sleep(request):
+        # answer first: the page asking is about to disappear with the browser
+        asyncio.ensure_future(s().sleep("Startseite"))
+        return web.json_response({"ok": True})
+
+    async def local_clipboard(request):
+        if "clipboard" not in state["ui"]:
+            state["ui"].append("clipboard")
+        s().touch()
         return web.json_response({"ok": True})
 
     # ── VNC stream ──────────────────────────────────────────────────────────
     async def websockify(request):
-        s = app["session"]
-        if s.state != sess.RUNNING:
+        if s().state != sess.RUNNING:
             raise web.HTTPServiceUnavailable(text="browser sleeping")
         ws = web.WebSocketResponse(protocols=("binary",), max_msg_size=0, heartbeat=30)
         await ws.prepare(request)
@@ -159,7 +182,8 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
         except OSError:
             await ws.close()
             return ws
-        s.viewer_joined()
+        session_ = s()
+        session_.viewer_joined()
 
         async def vnc_to_ws():
             while True:
@@ -167,6 +191,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
                 if not chunk:
                     break
                 await ws.send_bytes(chunk)
+            await ws.close()
 
         pump = asyncio.ensure_future(vnc_to_ws())
         try:
@@ -181,7 +206,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
         finally:
             pump.cancel()
             writer.close()
-            s.viewer_left()
+            session_.viewer_left()
             await ws.close()
         return ws
 
@@ -192,23 +217,24 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
     app.router.add_post("/api/sleep", sleep)
     app.router.add_post("/api/activity", activity)
     app.router.add_post("/api/open", open_site)
-    app.router.add_get("/api/tabs", tabs)
-    app.router.add_post("/api/tabs/{action:close|activate}", tab_action)
+    app.router.add_get("/api/ui", ui_requests)
+    app.router.add_get("/api/local/status", local_status)
+    app.router.add_post("/api/local/sleep", local_sleep)
+    app.router.add_post("/api/local/clipboard", local_clipboard)
     app.router.add_get("/websockify", websockify)
     app.router.add_static("/static/", STATIC)
     if os.path.isdir(NOVNC):
         app.router.add_static("/novnc/", NOVNC)
 
     async def on_start(app_):
-        app_["watcher"] = asyncio.ensure_future(app_["session"].run_watcher())
+        state["watcher"] = asyncio.ensure_future(s().run_watcher())
 
     async def on_cleanup(app_):
-        w = app_.get("watcher")
-        if w:
-            w.cancel()
-        await app_["session"].sleep("Addon wird beendet")
-        if app_["http"] is not None:
-            await app_["http"].close()
+        if state["watcher"]:
+            state["watcher"].cancel()
+        await s().sleep("Addon wird beendet")
+        if state["http"] is not None:
+            await state["http"].close()
 
     app.on_startup.append(on_start)
     app.on_cleanup.append(on_cleanup)
@@ -218,7 +244,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None):
 def main():
     opts = options.load()
     domains = options.logout_domains(opts)
-    sess.log(f"Seiten: {', '.join(s['name'] for s in opts['sites']) or 'keine'} · Schlafen nach "
+    sess.log(f"Seiten: {', '.join(x['name'] for x in opts['sites']) or 'keine'} · Schlafen nach "
              f"{opts['idle_minutes'] or 'nie'} min · Abmelden beim Schlafen: {', '.join(domains) or 'nichts'}")
     web.run_app(create_app(opts), host="0.0.0.0", port=PORT, print=None, access_log=None)
 

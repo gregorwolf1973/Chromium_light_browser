@@ -9,11 +9,15 @@ browser through noVNC over ingress - no port is published.
 
 - **Sleeping**: the panel shows "Browser schläft" and your site tiles. Click
   *Browser starten* or a tile. The virtual screen takes the size of the panel.
-- **Bar**: site tiles (🔒 = logged out when the browser sleeps), open tabs
-  (click to switch, ✕ to close), clipboard, fullscreen, **💤 Schlafen** to free
-  the memory right away. The bar shows when the browser will fall asleep.
-- **Clipboard**: text copied inside the browser appears in the 📋 panel; text
-  pasted there goes into the browser with *In den Browser*.
+- **Running**: the browser fills the whole panel - there is no toolbar. Every
+  new tab shows the **start page**: your site tiles (🔒 = logged out when the
+  browser sleeps), when it will fall asleep, **📋 Zwischenablage** and
+  **💤 Schlafen** to free the memory right away. Hide the Home Assistant sidebar
+  for a bigger picture.
+- **Clipboard**: <kbd>Ctrl</kbd>+<kbd>V</kbd> pastes text from your device into
+  the browser. Text copied inside the browser goes straight to your device's
+  clipboard when your browser allows it; otherwise *Zwischenablage* on the start
+  page opens a panel to move text in either direction.
 - **Downloads** go to `/share/browser`, uploads can be picked from there too.
 - **Logins** (cookies, WhatsApp Web pairing) are kept in `/data/profile` and
   survive sleeping, restarts and updates - except for sites with
@@ -94,5 +98,11 @@ is the heaviest part in any browser.
 - No port is published; the controller only answers the Supervisor's ingress
   proxy. Web pages inside the browser can reach neither the VNC stream nor the
   API nor Chromium's DevTools.
+- The start page inside the browser talks to the add-on with a secret that is
+  created anew at every start and only embedded in the start page itself. Other
+  web pages cannot read it, so they can neither put the browser to sleep nor
+  open the clipboard panel.
+- The start page is shown in new tabs by a small built-in extension
+  (`app/newtab`) that does nothing but redirect to it.
 - Chromium runs as an unprivileged user with `--no-sandbox` (the container has
   no user namespaces for Chromium's own sandbox).

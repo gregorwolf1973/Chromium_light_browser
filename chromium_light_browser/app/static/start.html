@@ -2,30 +2,78 @@
 <html lang="de">
 <head>
 <meta charset="utf-8">
+<meta name="referrer" content="no-referrer">
 <title>Startseite</title>
 <style>
-  :root { color-scheme: light dark; }
-  body { margin:0; font:15px/1.4 system-ui,"Segoe UI",Roboto,sans-serif; background:#f5f6fa; color:#1c1c1c; }
-  @media (prefers-color-scheme: dark) { body { background:#111318; color:#c8cdd5; } .tile { background:#1c1f27 !important; border-color:#333842 !important; } }
-  main { max-width:900px; margin:60px auto; padding:0 20px; }
+  :root { color-scheme: light dark; --bg:#f5f6fa; --card:#fff; --border:#e1e5eb; --text:#1c1c1c; --dim:#6e7681; --accent:#1a73e8; --ok:#0f9d58; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#111318; --card:#1c1f27; --border:#333842; --text:#c8cdd5; --dim:#7b8390; --accent:#8ab4f8; } }
+  body { margin:0; font:15px/1.4 system-ui,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:920px; margin:48px auto; padding:0 20px; }
+  header { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:22px; }
   h1 { font-size:1.4rem; margin:0 0 4px; }
-  .sub { color:#6e7681; margin-bottom:24px; }
+  .sub { color:var(--dim); }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .status { color:var(--dim); font-size:13px; display:flex; align-items:center; gap:6px; margin-right:4px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--ok); }
+  button { font:inherit; color:var(--text); background:var(--card); border:1px solid var(--border); border-radius:10px; padding:8px 14px; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
   .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; }
-  .tile { display:flex; flex-direction:column; gap:4px; padding:18px; background:#fff; border:1px solid #e1e5eb; border-radius:14px;
+  .tile { display:flex; flex-direction:column; gap:4px; padding:18px; background:var(--card); border:1px solid var(--border); border-radius:14px;
           text-decoration:none; color:inherit; }
-  .tile:hover { border-color:#1a73e8; }
-  .ico { width:40px; height:40px; border-radius:10px; background:#1a73e8; color:#fff; display:flex; align-items:center; justify-content:center;
+  .tile:hover { border-color:var(--accent); }
+  .ico { width:40px; height:40px; border-radius:10px; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center;
          font-weight:700; font-size:1.2rem; margin-bottom:6px; }
   .nm { font-weight:600; }
-  .u { color:#6e7681; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .empty { color:#6e7681; }
+  .u { color:var(--dim); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .empty { color:var(--dim); }
+  .hint { color:var(--dim); font-size:13px; margin-top:26px; line-height:1.6; }
+  kbd { border:1px solid var(--border); border-bottom-width:2px; border-radius:4px; padding:0 5px; font-size:12px; background:var(--card); }
 </style>
 </head>
 <body>
 <main>
-  <h1>Chromium Light Browser</h1>
-  <div class="sub">Deine Seiten. Weitere in der Addon-Konfiguration unter „sites“ eintragen.</div>
+  <header>
+    <div>
+      <h1>Chromium Light Browser</h1>
+      <div class="sub">Deine Seiten – weitere in der Addon-Konfiguration unter „sites“.</div>
+    </div>
+    <div class="controls">
+      <span class="status" id="status"><span class="dot"></span><span id="status-text">läuft</span></span>
+      <button id="clip" title="Text zwischen deinem Gerät und diesem Browser austauschen">📋 Zwischenablage</button>
+      <button id="sleep" title="Browser beenden und Arbeitsspeicher freigeben">💤 Schlafen</button>
+    </div>
+  </header>
   <div class="grid"><!--TILES--></div>
+  <div class="hint">
+    🔒 = wird beim Einschlafen abgemeldet. &nbsp;·&nbsp; Text von deinem Gerät einfügen: <kbd>Strg</kbd>+<kbd>V</kbd>.
+    Im Browser kopierter Text landet automatisch auf deinem Gerät, sonst über „Zwischenablage“.
+  </div>
 </main>
+<script>
+(function () {
+  var TOKEN = '__LOCAL_TOKEN__';
+  function call(method, path) {
+    return fetch('api/local/' + path, {method: method, headers: {'X-CLB-Local': TOKEN}}).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+  function showStatus() {
+    call('GET', 'status').then(function (st) {
+      var t = document.getElementById('status-text');
+      if (st.sleep_in_seconds === null || st.sleep_in_seconds === undefined) { t.textContent = 'läuft · schläft nicht automatisch'; return; }
+      var s = st.sleep_in_seconds;
+      t.textContent = 'läuft · schläft in ' + (s < 120 ? s + ' s' : Math.ceil(s / 60) + ' min');
+    }).catch(function () {});
+  }
+  document.getElementById('sleep').onclick = function () {
+    document.getElementById('status-text').textContent = 'schläft ein …';
+    call('POST', 'sleep').catch(function () {});
+  };
+  document.getElementById('clip').onclick = function () { call('POST', 'clipboard').catch(function () {}); };
+  showStatus();
+  setInterval(showStatus, 20000);
+})();
+</script>
 </body>
 </html>
