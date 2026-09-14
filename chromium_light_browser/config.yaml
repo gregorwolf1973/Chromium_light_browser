@@ -1,6 +1,6 @@
 name: "Chromium Light Browser"
 description: "Sparsamer Chromium in der Seitenleiste - startet bei Bedarf und schlaeft nach Leerlauf ein"
-version: "0.2.0"
+version: "0.2.1"
 url: "https://github.com/gregorwolf1973/Chromium_light_browser"
 slug: "chromium_light_browser"
 init: false

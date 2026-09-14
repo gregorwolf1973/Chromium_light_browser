@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Eigenes Icon und Logo (Browserfenster mit Mond: startet bei Bedarf, schlaeft danach) fuer den Addon-Store und die Addon-Seite.
+- Favicon fuer die Seite in der Seitenleiste und fuer die Startseite im Browser-Tab.
+- "Buy Me A Coffee"-Button in README und Dokumentation, Sponsor-Link auf GitHub.
+
 ## 0.2.0
 
 - **Keine Leiste mehr ueber dem Browser.** Das Bild fuellt die ganze Seite. Kacheln, Status, Zwischenablage und Schlafen stehen auf der Startseite, und die zeigt jetzt **jeder neue Tab** (eingebaute Mini-Erweiterung, die die Neuer-Tab-Seite ersetzt). Die doppelte Kachel-Leiste und die Tab-Leiste entfallen - Chromium hat seine eigenen Tabs.

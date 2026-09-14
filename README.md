@@ -1,5 +1,11 @@
 # Chromium Light Browser – Home Assistant add-on
 
+<img src="chromium_light_browser/logo.png" alt="Chromium Light Browser" width="96">
+
+![Architectures](https://img.shields.io/badge/arch-aarch64%20|%20amd64-blue)
+
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/gregorwolf1973)
+
 A memory-friendly browser in the Home Assistant sidebar: Chromium starts when you
 open the panel and goes to sleep after a configurable idle time, freeing its memory.
 Tiles for your own sites (devices on your network, WhatsApp Web, online banking),
