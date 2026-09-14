@@ -104,7 +104,10 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
         with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as f:
             html = f.read()
         html = html.replace("/*__CONFIG__*/null", json.dumps(public_config()).replace("</", "<\\/"))
-        html = html.replace('src="static/app.js"', f'src="static/app.js?v={asset_version()}"')
+        # a new file name per version: a reverse proxy with asset caching (Nginx
+        # Proxy Manager "Cache Assets") ignores query strings and kept serving
+        # the app.js of an older release for hours
+        html = html.replace('src="static/app.js"', f'src="assets/app-{asset_version()}.js"')
         return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-store"})
 
     async def start_page(request):
@@ -120,6 +123,13 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
         html = html.replace("<!--TILES-->", tiles).replace("__LOCAL_TOKEN__", state["token"])
         return web.Response(text=html, content_type="text/html",
                             headers={"Cache-Control": "no-store", "X-Frame-Options": "DENY"})
+
+    async def versioned_app_js(request):
+        if request.match_info["v"] != asset_version():
+            raise web.HTTPNotFound()
+        with open(os.path.join(STATIC, "app.js"), encoding="utf-8") as f:
+            return web.Response(text=f.read(), content_type="application/javascript",
+                                headers={"Cache-Control": "public, max-age=31536000, immutable"})
 
     async def body(request):
         try:
@@ -237,6 +247,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
     app.router.add_post("/api/local/sleep", local_sleep)
     app.router.add_post("/api/local/clipboard", local_clipboard)
     app.router.add_get("/websockify", websockify)
+    app.router.add_get("/assets/app-{v:[0-9a-f]{12}}.js", versioned_app_js)
     app.router.add_static("/static/", STATIC)
     if os.path.isdir(NOVNC):
         app.router.add_static("/novnc/", NOVNC)

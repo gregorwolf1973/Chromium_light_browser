@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.3
+
+- **Fix: Die leere Seite blieb auch mit 0.2.2.** Nicht der Browser, sondern ein Zwischenspeicher vor Home Assistant (z. B. "Cache Assets" im Nginx Proxy Manager) lieferte die `app.js` von 0.1.0 weiter aus - er beachtet keine Adresszusaetze und setzt eigene Ablaufzeiten. Das Skript hat jetzt je Version einen eigenen Dateinamen (`assets/app-<kennung>.js`), den kein Zwischenspeicher kennen kann.
+
 ## 0.2.2
 
 - **Fix: Nach dem Update auf 0.2.x blieb die Seite leer.** Der Browser nahm die alte `app.js` aus dem Zwischenspeicher, die zur neuen Seite nicht passt, und brach ab. `app.js` wird jetzt mit ihrer Versionskennung im Adresszusatz geladen, und alle Dateien unter `static/` werden bei jedem Aufruf neu geprueft.
