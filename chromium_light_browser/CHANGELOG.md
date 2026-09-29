@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.4
+
+- **Fix: Der Browser zeigte UTC statt der eigenen Uhrzeit** (5:22 statt 7:22). Im Add-on kam keine Zeitzone an. Sie wird jetzt aus Home Assistant gelesen (Einstellungen → System → Allgemein), die Zeitzonendaten sind im Image.
+- **Tastatur auf Tablet und Handy:** Rechts unten steht ein runder **⌨**-Knopf. Erst ins Textfeld im Browser tippen, dann auf ⌨ - die Bildschirmtastatur des Geräts öffnet sich und schreibt in den Browser. Nochmal ⌨ schließt sie.
+
 ## 0.2.3
 
 - **Fix: Die leere Seite blieb auch mit 0.2.2.** Nicht der Browser, sondern ein Zwischenspeicher vor Home Assistant (z. B. "Cache Assets" im Nginx Proxy Manager) lieferte die `app.js` von 0.1.0 weiter aus - er beachtet keine Adresszusaetze und setzt eigene Ablaufzeiten. Das Skript hat jetzt je Version einen eigenen Dateinamen (`assets/app-<kennung>.js`), den kein Zwischenspeicher kennen kann.

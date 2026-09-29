@@ -13,6 +13,7 @@ RUN apk add --no-cache \
         python3 \
         py3-aiohttp \
         su-exec \
+        tzdata \
         font-dejavu \
         font-noto-emoji \
     && adduser -D -h /home/browser -s /sbin/nologin browser

@@ -34,6 +34,13 @@
   .panel .row { display:flex; gap:6px; justify-content:flex-end; margin-top:10px; flex-wrap:wrap; }
   .toast { position:absolute; left:50%; bottom:18px; transform:translateX(-50%); background:rgba(20,20,20,.85); color:#fff; padding:6px 12px;
            border-radius:8px; font-size:12px; z-index:6; pointer-events:none; }
+  /* Bildschirmtastatur: das Feld ist unsichtbar, aber fokussierbar; 16px verhindert das Zoomen auf iOS */
+  #kbd-input { position:absolute; left:0; bottom:0; width:1px; height:1px; opacity:0; border:0; padding:0;
+               font-size:16px; resize:none; z-index:-1; }
+  #kbd-btn { position:absolute; right:10px; bottom:10px; z-index:4; width:44px; height:44px; padding:0; font-size:22px;
+             border-radius:50%; background:rgba(30,30,30,.55); color:#fff; border:1px solid rgba(255,255,255,.35); opacity:.6; }
+  #kbd-btn.on { opacity:1; background:var(--accent); color:var(--accent-text); }
+
   .spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; margin:0 auto 12px; }
   @keyframes spin { to { transform:rotate(360deg); } }
 </style>
@@ -52,6 +59,8 @@
       <button class="primary" id="clip-send">In den Browser</button>
     </div>
   </div>
+  <textarea id="kbd-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-hidden="true"></textarea>
+  <button id="kbd-btn" hidden title="Bildschirmtastatur" aria-label="Bildschirmtastatur">⌨</button>
   <div class="toast" id="toast" hidden></div>
 </div>
 <script>window.CLB_CONFIG = /*__CONFIG__*/null;</script>

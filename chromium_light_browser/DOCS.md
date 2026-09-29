@@ -20,6 +20,10 @@ browser through noVNC over ingress - no port is published.
   the browser. Text copied inside the browser goes straight to your device's
   clipboard when your browser allows it; otherwise *Zwischenablage* on the start
   page opens a panel to move text in either direction.
+- **Keyboard on tablets and phones**: tap the text field in the browser, then
+  the round **⌨** button in the lower right corner - your device keyboard
+  opens and types into the browser. Tap ⌨ again to close it.
+- **Time zone** follows Home Assistant (Settings → System → General).
 - **Downloads** go to `/share/browser`, uploads can be picked from there too.
 - **Logins** (cookies, WhatsApp Web pairing) are kept in `/data/profile` and
   survive sleeping, restarts and updates - except for sites with

@@ -46,6 +46,46 @@ def clamp_size(w, h):
     return w, h
 
 
+ZONEINFO = "/usr/share/zoneinfo"
+
+
+def _supervisor_timezone():
+    """The time zone set in Home Assistant (Settings > System > General)."""
+    token = os.environ.get("SUPERVISOR_TOKEN")
+    if not token:
+        return ""
+    import urllib.request
+    try:
+        req = urllib.request.Request("http://supervisor/info", headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return str(json.load(r).get("data", {}).get("timezone") or "")
+    except Exception as e:          # noqa: BLE001 - no Supervisor, no answer: stay with what we have
+        log(f"Zeitzone vom Supervisor nicht lesbar: {e}")
+        return ""
+
+
+def setup_timezone(zoneinfo=ZONEINFO, localtime="/etc/localtime", lookup=_supervisor_timezone):
+    """Chromium showed UTC (5:22 instead of 7:22): the image had no time zone
+    data, so neither TZ nor /etc/localtime meant anything. Take the zone from
+    Home Assistant (TZ from the Supervisor, else its API), check that the data
+    exists, point /etc/localtime at it and export TZ for every child process."""
+    tz = os.environ.get("TZ", "").strip()
+    if not tz or not os.path.isfile(os.path.join(zoneinfo, tz)):
+        tz = lookup().strip() or tz
+    if not tz or not os.path.isfile(os.path.join(zoneinfo, tz)):
+        log(f"Zeitzone unbekannt ({tz or 'nicht gesetzt'}) - der Browser zeigt UTC")
+        return ""
+    os.environ["TZ"] = tz
+    try:
+        if os.path.lexists(localtime):
+            os.remove(localtime)
+        os.symlink(os.path.join(zoneinfo, tz), localtime)
+    except OSError:
+        pass                        # TZ alone is enough for Chromium
+    log(f"Zeitzone: {tz}")
+    return tz
+
+
 def chromium_binary():
     return shutil.which("chromium-browser") or shutil.which("chromium") or "chromium-browser"
 

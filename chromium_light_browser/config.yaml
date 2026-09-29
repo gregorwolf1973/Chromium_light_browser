@@ -1,6 +1,6 @@
 name: "Chromium Light Browser"
 description: "Sparsamer Chromium in der Seitenleiste - startet bei Bedarf und schlaeft nach Leerlauf ein"
-version: "0.2.3"
+version: "0.2.4"
 url: "https://github.com/gregorwolf1973/Chromium_light_browser"
 slug: "chromium_light_browser"
 init: false
@@ -12,6 +12,7 @@ boot: auto
 ingress: true
 ingress_port: 8099
 ingress_stream: true
+hassio_api: true
 panel_icon: "mdi:google-chrome"
 panel_title: "Browser"
 map:

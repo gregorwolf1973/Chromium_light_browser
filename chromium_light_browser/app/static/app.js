@@ -121,11 +121,13 @@ function connect() {
     setTimeout(refreshStatus, 800);
   });
   rfb.addEventListener('clipboard', e => remoteCopied(e.detail.text));
+  $('kbd-btn').hidden = false;
   startUiPolling();
 }
 
 function disconnect() {
   stopUiPolling();
+  $('kbd-btn').hidden = true;
   if (!rfb) return;
   const r = rfb;
   rfb = null;
@@ -210,6 +212,61 @@ $('clip-send').onclick = () => {
 $('clip-copy').onclick = async () => {
   try { await navigator.clipboard.writeText($('clip-text').value); toast('Kopiert'); }
   catch (e) { $('clip-text').select(); document.execCommand('copy'); toast('Kopiert'); }
+};
+
+// ── on-screen keyboard (tablets, phones) ───────────────────────────────────
+// The picture is a canvas, so tapping into a text field in Chromium never
+// brings up the device keyboard. The ⌨ button focuses a hidden text field
+// instead; what the device keyboard types there is sent on as key presses.
+// The field is kept filled with padding so Backspace always has something to
+// delete (Android sends no key codes, only the changed text), and autocorrect
+// replacing a word shows up as "n characters removed, new text added".
+const XK_BackSpace = 0xff08, XK_Return = 0xff0d, XK_Tab = 0xff09, XK_Escape = 0xff1b,
+      XK_Left = 0xff51, XK_Up = 0xff52, XK_Right = 0xff53, XK_Down = 0xff54, XK_Delete = 0xffff;
+const SPECIAL = {Backspace: XK_BackSpace, Enter: XK_Return, Tab: XK_Tab, Escape: XK_Escape, Delete: XK_Delete,
+                 ArrowLeft: XK_Left, ArrowUp: XK_Up, ArrowRight: XK_Right, ArrowDown: XK_Down};
+const PAD = '_'.repeat(64);
+const kbd = $('kbd-input');
+let kbdLast = PAD;
+
+function keysymFor(ch) {
+  if (ch === '\n') return XK_Return;
+  const cp = ch.codePointAt(0);
+  return (cp >= 0x20 && cp <= 0xff) ? cp : 0x01000000 + cp;      // Latin-1 as is, the rest as Unicode keysym
+}
+function tap(keysym) {
+  if (!rfb) return;
+  rfb.sendKey(keysym, null, true);
+  rfb.sendKey(keysym, null, false);
+}
+function kbdReset() {
+  kbd.value = PAD;
+  kbdLast = PAD;
+  try { kbd.setSelectionRange(PAD.length, PAD.length); } catch (e) {}
+}
+kbd.addEventListener('input', () => {
+  const now = kbd.value;
+  let same = 0;
+  while (same < kbdLast.length && same < now.length && kbdLast[same] === now[same]) same++;
+  for (let i = same; i < kbdLast.length; i++) tap(XK_BackSpace);
+  for (const ch of now.slice(same)) tap(keysymFor(ch));
+  kbdLast = now;
+  if (now.length < 16 || now.length > 200) kbdReset();
+});
+kbd.addEventListener('keydown', e => {
+  const ks = SPECIAL[e.key];
+  if (!ks) return;                         // letters come through 'input'
+  e.preventDefault();
+  e.stopPropagation();
+  tap(ks);
+});
+kbd.addEventListener('blur', () => $('kbd-btn').classList.remove('on'));
+$('kbd-btn').addEventListener('pointerdown', e => e.preventDefault());   // keep the focus where it is
+$('kbd-btn').onclick = () => {
+  if (document.activeElement === kbd) { kbd.blur(); if (rfb) rfb.focus(); return; }
+  kbdReset();
+  kbd.focus();
+  $('kbd-btn').classList.add('on');
 };
 
 // ── activity, visibility ───────────────────────────────────────────────────

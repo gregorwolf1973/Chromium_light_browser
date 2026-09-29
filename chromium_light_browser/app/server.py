@@ -270,6 +270,7 @@ def create_app(opts, session=None, allowed_ips=None, http=None, local_token=None
 def main():
     opts = options.load()
     domains = options.logout_domains(opts)
+    sess.setup_timezone()
     sess.log(f"Seiten: {', '.join(x['name'] for x in opts['sites']) or 'keine'} · Schlafen nach "
              f"{opts['idle_minutes'] or 'nie'} min · Abmelden beim Schlafen: {', '.join(domains) or 'nichts'}")
     web.run_app(create_app(opts), host="0.0.0.0", port=PORT, print=None, access_log=None)

@@ -442,5 +442,35 @@ class ServerTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.fs.viewers, 0)
 
 
+class TimezoneTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.zi = os.path.join(self.tmp, "zoneinfo")
+        os.makedirs(os.path.join(self.zi, "Europe"))
+        with open(os.path.join(self.zi, "Europe", "Berlin"), "wb") as f:
+            f.write(b"TZif")
+        self.lt = os.path.join(self.tmp, "localtime")
+        self.old_tz = os.environ.pop("TZ", None)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        os.environ.pop("TZ", None)
+        if self.old_tz is not None:
+            os.environ["TZ"] = self.old_tz
+
+    def test_tz_from_supervisor_env(self):
+        os.environ["TZ"] = "Europe/Berlin"
+        self.assertEqual(sess.setup_timezone(self.zi, self.lt, lookup=lambda: self.fail("no API needed")), "Europe/Berlin")
+        self.assertEqual(os.environ["TZ"], "Europe/Berlin")
+
+    def test_tz_from_api_when_env_missing(self):
+        self.assertEqual(sess.setup_timezone(self.zi, self.lt, lookup=lambda: "Europe/Berlin"), "Europe/Berlin")
+        self.assertEqual(os.environ["TZ"], "Europe/Berlin")
+
+    def test_unknown_zone_leaves_utc(self):
+        self.assertEqual(sess.setup_timezone(self.zi, self.lt, lookup=lambda: "Mars/Olympus"), "")
+        self.assertNotIn("TZ", os.environ)
+
+
 if __name__ == "__main__":
     unittest.main()
