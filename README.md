@@ -4,7 +4,7 @@
 
 ![Architectures](https://img.shields.io/badge/arch-aarch64%20|%20amd64-blue)
 
-[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/gregorwolf1973)
+[!["Buy Me A Coffee"](https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png)](https://buymeacoffee.com/gregorwolf1973) [![Donate using Liberapay](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/Gregor_Wolf/donate)
 
 A memory-friendly browser in the Home Assistant sidebar: Chromium starts when you
 open the panel and goes to sleep after a configurable idle time, freeing its memory.
